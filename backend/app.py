@@ -1,23 +1,47 @@
+import os
+import asyncio
+import pandas as pd
+import joblib
+import torch
+import torch.nn as nn
 from fastapi import FastAPI
 from pydantic import BaseModel
-import joblib
-import pandas as pd
-import asyncio
 
-# Create FastAPI App
-app = FastAPI()
+# Initialize FastAPI App
+app = FastAPI(title="Loan Application Deep Learning API")
 
+# Define PyTorch Neural Network Architecture
+class SimpleLoanMLP(nn.Module):
+    def __init__(self, input_dim=6):
+        super(SimpleLoanMLP, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, 16),
+            nn.ReLU(),
+            nn.Linear(16, 8),
+            nn.ReLU(),
+            nn.Linear(8, 1),
+            nn.Sigmoid()
+        )
 
-# Load Model
-model = joblib.load("D:/SoftCoding_practice/Loan_Application_Model/backend/model.pkl")
+    def forward(self, x):
+        return self.network(x)
+
+# Resolve paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "model.pth")
+SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
 
 # Load Scaler
-scaler = joblib.load("D:/SoftCoding_practice/Loan_Application_Model/backend/scaler.pkl")
+scaler = joblib.load(SCALER_PATH)
 
+# Load PyTorch Model
+model = SimpleLoanMLP(input_dim=6)
+if os.path.exists(MODEL_PATH):
+    model.load_state_dict(torch.load(MODEL_PATH))
+model.eval()
 
 # Request Body Schema
 class LoanInput(BaseModel):
-       
     no_of_dependents: int
     income_annum: int
     loan_amount: int
@@ -28,40 +52,43 @@ class LoanInput(BaseModel):
 # Home Route
 @app.get("/")
 async def home():
-    return {"message": "Loan Prediction API Running"}
-
+    return {"message": "Loan Approval Deep Learning API is running successfully"}
 
 # Prediction Route
 @app.post("/predict")
 async def predict_loan(data: LoanInput):
-    print("Received data: " , data)
-    # Simulate async work
-    await asyncio.sleep(0.1)
+    print("Received prediction request:", data)
 
-    # Convert to DataFrame
-    input_data = pd.DataFrame(
-        [
-            {
-                ' no_of_dependents': data.no_of_dependents,
-                ' income_annum': data.income_annum,
-                ' loan_amount': data.loan_amount,
-                ' loan_term': data.loan_term,
-                ' cibil_score': data.cibil_score,
-                'total_assets_value': data.total_assets_value,    
-            }
-        ]
-    )
+    # Convert incoming payload to pandas DataFrame
+    input_df = pd.DataFrame([
+        {
+            'no_of_dependents': data.no_of_dependents,
+            'income_annum': data.income_annum,
+            'loan_amount': data.loan_amount,
+            'loan_term': data.loan_term,
+            'cibil_score': data.cibil_score,
+            'total_assets_value': data.total_assets_value,
+        }
+    ])
 
-    # Scale Data
-    scaled_data = scaler.transform(input_data)
+    # Scale input data
+    scaled_data = scaler.transform(input_df)
 
-    # Predict
-    prediction = model.predict(scaled_data)[0]
+    # Convert to PyTorch Tensor
+    input_tensor = torch.tensor(scaled_data, dtype=torch.float32)
 
-    # Probability
-    probability = model.predict_proba(scaled_data)[0][1]
+    # Perform Deep Learning Inference
+    with torch.no_grad():
+        probability = model(input_tensor).item()
 
-    # Final Result
-    result = "Approved" if prediction == 1 else "Rejected"
+    prediction_result = "Approved" if probability >= 0.5 else "Rejected"
 
-    return {"prediction": result, "approval_probability": float(probability)}
+    return {
+        "prediction": prediction_result,
+        "approval_probability": round(float(probability), 4)
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
+
