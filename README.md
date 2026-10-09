@@ -226,3 +226,45 @@ streamlit run streamlit_app.py
 - **Model or Scaler File Missing**: If `model.pth` or `scaler.pkl` are not found inside `backend/`, execute `python train_model.py` at the project root level.
 - **Port Conflicts**: If port 8000 is occupied, launch FastAPI with a custom port: `uvicorn app:app --reload --port 8001` and update `http://127.0.0.1:8001/predict` in `frontend/streamlit_app.py`.
 
+---
+
+## 🌐 Deploying to Render
+
+This repository is pre-configured for seamless deployment on [Render](https://render.com).
+
+### Method 1: Render Blueprint Deployment (Recommended)
+
+1. Push this project repository to **GitHub** or **GitLab**.
+2. Log into your [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** $\rightarrow$ **Blueprint**.
+4. Connect your GitHub repository.
+5. Render will automatically read [`render.yaml`](file:///d:/SoftCoding_practice/Loan_Application_Model/render.yaml) and create both services:
+   - `loan-approval-backend` (FastAPI REST API)
+   - `loan-approval-frontend` (Streamlit Web Interface)
+6. Click **Apply**. Both services will build and deploy automatically!
+
+---
+
+### Method 2: Manual Web Service Deployment on Render
+
+If you prefer setting up services manually on Render:
+
+#### 1. Deploy the Backend Web Service (`loan-approval-backend`)
+- **Service Type**: Web Service
+- **Environment**: Python 3
+- **Build Command**: `pip install -r backend/requirements.txt && python train_model.py`
+- **Start Command**: `uvicorn backend.app:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `PYTHON_VERSION`: `3.10.0`
+- Note down your deployed backend URL (e.g. `https://loan-approval-backend.onrender.com`).
+
+#### 2. Deploy the Frontend Web Service (`loan-approval-frontend`)
+- **Service Type**: Web Service
+- **Environment**: Python 3
+- **Build Command**: `pip install -r frontend/requirements.txt`
+- **Start Command**: `streamlit run frontend/streamlit_app.py --server.port $PORT --server.address 0.0.0.0`
+- **Environment Variables**:
+  - `PYTHON_VERSION`: `3.10.0`
+  - `BACKEND_URL`: `https://loan-approval-backend.onrender.com` (Your backend service URL from step 1)
+
+
