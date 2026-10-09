@@ -5,10 +5,20 @@ import joblib
 import torch
 import torch.nn as nn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Initialize FastAPI App
 app = FastAPI(title="Loan Application Deep Learning API")
+
+# Add CORS Middleware for production & Render deployment
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Define PyTorch Neural Network Architecture
 class SimpleLoanMLP(nn.Module):
@@ -30,6 +40,15 @@ class SimpleLoanMLP(nn.Module):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model.pth")
 SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
+
+# Ensure model & scaler exist (train automatically if missing on deployment)
+if not os.path.exists(MODEL_PATH) or not os.path.exists(SCALER_PATH):
+    print("Model/Scaler missing. Training model...")
+    root_dir = os.path.dirname(BASE_DIR)
+    train_script = os.path.join(root_dir, "train_model.py")
+    if os.path.exists(train_script):
+        import subprocess
+        subprocess.run(["python", train_script], check=True)
 
 # Load Scaler
 scaler = joblib.load(SCALER_PATH)
@@ -90,5 +109,7 @@ async def predict_loan(data: LoanInput):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
 

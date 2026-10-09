@@ -1,0 +1,22 @@
+services:
+  # 1. FastAPI Backend Web Service
+  - type: web
+    name: loan-approval-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt && python train_model.py
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+
+  # 2. Streamlit Frontend Web Service
+  - type: web
+    name: loan-approval-frontend
+    env: python
+    buildCommand: pip install -r frontend/requirements.txt
+    startCommand: streamlit run frontend/streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: BACKEND_URL
+        value: https://loan-approval-backend.onrender.com
