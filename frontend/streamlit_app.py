@@ -41,10 +41,11 @@ if st.button("🚀 Analyze & Predict Loan Status", use_container_width=True):
         "total_assets_value": int(total_assets_value),
     }
 
-    with st.spinner("Processing applicant profile through PyTorch Deep Learning Model..."):
+    with st.spinner("Processing applicant profile through PyTorch Deep Learning Model (waiting for backend response)..."):
         try:
             api_endpoint = f"{BACKEND_URL}/predict"
-            response = requests.post(api_endpoint, json=payload, timeout=15)
+            # Increased timeout to 60s to accommodate Render Free Tier cold-start wake up
+            response = requests.post(api_endpoint, json=payload, timeout=60)
             
             if response.status_code == 200:
                 result = response.json()
@@ -60,9 +61,20 @@ if st.button("🚀 Analyze & Predict Loan Status", use_container_width=True):
                 col_acc1, col_acc2 = st.columns(2)
                 col_acc1.metric("Decision", prediction)
                 col_acc2.metric("Approval Probability", f"{probability * 100:.2f}%")
+            elif response.status_code in (502, 503, 504):
+                st.warning("⚠️ **Backend is waking up (Render Free Tier Cold-Start)**")
+                st.info(
+                    "On Render's Free Plan, backend web services go to sleep after 15 minutes of inactivity. "
+                    "Render is currently waking up your `loan-approval-backend` service (takes about 30–60 seconds).\n\n"
+                    "👉 **Solution:** Wait 30 seconds and click the **Predict** button again!"
+                )
             else:
                 st.error(f"Error from API server (Status {response.status_code}): {response.text}")
+        except requests.exceptions.Timeout:
+            st.warning("⏳ **Request Timed Out (Backend Cold-Start)**")
+            st.info("The backend server is waking up on Render. Please wait 30 seconds and click the Predict button again.")
         except requests.exceptions.RequestException as e:
             st.error(f"Failed to connect to backend server at `{BACKEND_URL}`. Details: {e}")
-            st.info("If deploying on Render, please ensure the backend web service is active and `BACKEND_URL` environment variable is set.")
+            st.info("Please ensure the `loan-approval-backend` Web Service is deployed on Render and `BACKEND_URL` environment variable is correctly set in Streamlit settings.")
+
 
